@@ -1,6 +1,10 @@
+@import './fonts.css';
 @import 'tailwindcss';
 
 @theme {
+  --font-franklin: nyt-franklin, Arial;
+  --font-karnak-condensed: nyt-karnakcondensed;
+
   --color-cool-grey: #f8f8f8;
   --color-lightest-beige: #ececdb;
   --color-light-beige: #cfcfbf;
@@ -13,4 +17,10 @@
   --color-maroon: #ba81c5;
   --color-blue: #b0c4ef;
   --color-green: #a0c35a;
+}
+
+@layer base {
+  body {
+    @apply font-franklin font-medium;
+  }
 }

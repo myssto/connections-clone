@@ -101,20 +101,20 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       {/* Game control buttons */}
       <div className="flex justify-center gap-4">
         <button
-          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black"
+          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold"
           onClick={() => setCells((prev) => shuffle(prev))}
         >
           Shuffle
         </button>
         <button
-          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
+          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
           disabled={selectedCells.length === 0}
           onClick={() => setSelectedCells([])}
         >
           Deselect
         </button>
         <button
-          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] bg-black text-white transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:bg-inherit disabled:text-gray-500"
+          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] bg-black font-semibold text-white transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:bg-inherit disabled:text-gray-500"
           disabled={selectedCells.length !== 4}
           onClick={handleSubmit}
         >

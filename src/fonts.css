@@ -1,0 +1,41 @@
+@font-face {
+  font-family: nyt-franklin;
+  font-style: normal;
+  font-weight: 300;
+  src: url('/fonts/franklin-normal-300.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: nyt-franklin;
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/franklin-normal-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: nyt-franklin;
+  font-style: normal;
+  font-weight: 500;
+  src: url('/fonts/franklin-normal-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: nyt-franklin;
+  font-style: normal;
+  font-weight: 600;
+  src: url('/fonts/franklin-normal-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: nyt-franklin;
+  font-style: normal;
+  font-weight: 700;
+  src: url('/fonts/franklin-normal-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: nyt-karnakcondensed;
+  font-style: normal;
+  font-weight: 700;
+  src: url('/fonts/karnakcondensed-normal-700.woff2') format('woff2');
+}
