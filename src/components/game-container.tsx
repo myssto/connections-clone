@@ -60,7 +60,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   };
 
   return (
-    <div className="mx-auto max-w-2/3 space-y-4 py-6">
+    <div className="mx-auto flex flex-1 flex-col space-y-4 py-6 md:w-fit">
       {/* Id + timer */}
       <div className="mx-1 mb-2 flex justify-between">
         <span className="flex items-center gap-1">
@@ -70,7 +70,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         <GameTimer enabled />
       </div>
       {/* Word grid */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid h-[calc(3*8px+4*23vw)] grid-cols-4 gap-2 md:mx-auto md:h-[calc(3*8px+4*80px)]">
         {completedGroups.map((level) => (
           <CompletedGroup
             key={level}

@@ -21,7 +21,7 @@ export default function GameTimer({
         }, 1000)
       : undefined;
     return () => clearInterval(update);
-  });
+  }, [enabled]);
 
   return <span {...props}>{formatTime(timer)}</span>;
 }

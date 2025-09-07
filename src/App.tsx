@@ -7,13 +7,11 @@ export default function App() {
   const [puzzle, setPuzzle] = useState(puzzles.at(-1)!);
 
   return (
-    <main className="mx-auto w-full max-w-[1050px] flex-col pb-5 text-center sm:px-5 sm:py-10">
-      <img
-        src={connectionsLogo}
-        alt="Connections logo"
-        className="m-auto size-14"
-      />
-      <h1 className="font-karnak-condensed text-3xl">Connections</h1>
+    <main className="mx-auto w-full max-w-[1050px] p-2 text-center md:p-4">
+      <div className="mb-1 flex items-end justify-center gap-1">
+        <img src={connectionsLogo} alt="Connections logo" className="size-14" />
+        <h1 className="font-karnak-condensed text-5xl">Connections</h1>
+      </div>
       <h2>Group words that share a common thread</h2>
       <GameContainer puzzle={puzzle} />
       {/* Meta control buttons */}
