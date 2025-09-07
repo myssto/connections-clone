@@ -60,7 +60,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   };
 
   return (
-    <div className="mx-auto flex flex-1 flex-col space-y-4 py-6 md:w-fit">
+    <>
       {/* Id + timer */}
       <div className="mx-1 mb-2 flex justify-between">
         <span className="flex items-center gap-1">
@@ -121,6 +121,6 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
           Submit
         </button>
       </div>
-    </div>
+    </>
   );
 }
