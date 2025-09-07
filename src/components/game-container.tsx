@@ -67,7 +67,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
           Puzzle #{puzzle.id}
           <span className="text-sm text-gray-500">({puzzle.date})</span>
         </span>
-        <GameTimer />
+        <GameTimer enabled />
       </div>
       {/* Word grid */}
       <div className="grid grid-cols-4 gap-2">
