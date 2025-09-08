@@ -3,6 +3,7 @@ import WordCell from './word-cell';
 import GameTimer from './game-timer';
 import { useState } from 'react';
 import CompletedGroup from './completed-group';
+import { cn } from '../lib/util';
 
 function shuffle<T>(arr: T[]): T[] {
   return arr
@@ -12,6 +13,12 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGuessIncorrect, setIsGuessIncorrect] = useState(false);
+  const [guessHistory, setGuessHistory] = useState<number[][]>([]);
+  const [mistakes, setMistakes] = useState(0);
+  const [completedGroups, setCompletedGroups] = useState<number[]>([]);
+  const [selectedCells, setSelectedCells] = useState<number[]>([]);
   const [cells, setCells] = useState<PuzzleCell[]>(
     shuffle(
       puzzle.answers.flatMap((group) =>
@@ -23,9 +30,6 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       )
     )
   );
-  const [mistakes, setMistakes] = useState(0);
-  const [selectedCells, setSelectedCells] = useState<number[]>([]);
-  const [completedGroups, setCompletedGroups] = useState<number[]>([]);
 
   const handleCellClick = (cellId: number) => {
     if (selectedCells.includes(cellId)) {
@@ -39,9 +43,11 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   };
 
   const handleSubmit = () => {
+    setIsSubmitting(true);
     const selection = selectedCells.map(
       (id) => cells.find((cell) => cell.id === id)!
     );
+
     if (
       selection.every((cell) => cell.groupLevel === selection[0].groupLevel)
     ) {
@@ -49,14 +55,21 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       setCompletedGroups([...completedGroups, selection[0].groupLevel]);
       setCells(cells.filter((cell) => !selectedCells.includes(cell.id)));
       setSelectedCells([]);
+
+      setIsSubmitting(false);
     } else {
       // Failed guess
+      setGuessHistory([...guessHistory, selectedCells]);
+      setIsGuessIncorrect(true);
+      setTimeout(() => setIsGuessIncorrect(false), 500);
       setMistakes((prev) => prev + 1);
       // Game over
-      if (mistakes < 3) {
-        return;
-      }
+      // if (mistakes < 3) {
+      //   return;
+      // }
     }
+
+    setTimeout(() => setIsSubmitting(false), 500);
   };
 
   return (
@@ -79,6 +92,11 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         ))}
         {cells.map((cell) => (
           <WordCell
+            className={cn(
+              isGuessIncorrect
+                ? 'data-[selected="true"]:animate-shake-error'
+                : ''
+            )}
             key={cell.id}
             word={cell.word}
             data-selected={selectedCells.includes(cell.id)}
@@ -91,9 +109,10 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         <span>Mistakes Remaining:</span>
         {[...Array(4).keys()].reverse().map((i) => (
           <span
-            className={`size-4 rounded-full ${
+            className={cn(
+              'size-4 rounded-full',
               i >= mistakes ? 'bg-darkest-beige' : 'bg-inherit'
-            }`}
+            )}
             key={i}
           />
         ))}
@@ -102,20 +121,27 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       <div className="flex justify-center gap-4">
         <button
           className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold"
+          disabled={isSubmitting}
           onClick={() => setCells((prev) => shuffle(prev))}
         >
           Shuffle
         </button>
         <button
           className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
-          disabled={selectedCells.length === 0}
+          disabled={selectedCells.length === 0 || isSubmitting}
           onClick={() => setSelectedCells([])}
         >
           Deselect
         </button>
         <button
-          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] bg-black font-semibold text-white transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:bg-inherit disabled:text-gray-500"
-          disabled={selectedCells.length !== 4}
+          className="h-12 w-32 cursor-pointer rounded-4xl bg-black font-semibold text-white transition-colors disabled:cursor-auto disabled:border-[1px] disabled:border-gray-500 disabled:bg-inherit disabled:text-gray-500"
+          disabled={
+            selectedCells.length !== 4 ||
+            isSubmitting ||
+            guessHistory.some(
+              (hist) => JSON.stringify(hist) === JSON.stringify(selectedCells)
+            )
+          }
           onClick={handleSubmit}
         >
           Submit
