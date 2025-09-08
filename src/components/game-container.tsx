@@ -52,10 +52,29 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       selection.every((cell) => cell.groupLevel === selection[0].groupLevel)
     ) {
       // Successful completion
-      setCompletedGroups([...completedGroups, selection[0].groupLevel]);
-      setCells(cells.filter((cell) => !selectedCells.includes(cell.id)));
-      setSelectedCells([]);
+      // setCompletedGroups([...completedGroups, selection[0].groupLevel]);
+      // setCells(cells.filter((cell) => !selectedCells.includes(cell.id)));
+      // setSelectedCells([]);
 
+      // Move completed group the the top of the grid
+      const newCells = [...cells];
+
+      const selectedSwap = selectedCells
+        .map((id) => cells.findIndex((c) => c.id === id))
+        .filter((i) => i > 3);
+
+      const currentSwap = cells
+        .slice(0, 3)
+        .map(({ id }, index) => ({ id, index }))
+        .filter(({ id }) => !selectedCells.includes(id))
+        .map(({ index }) => index);
+
+      selectedSwap.forEach((from, i) => {
+        const to = currentSwap[i];
+        [newCells[from], newCells[to]] = [newCells[to], newCells[from]];
+      });
+
+      setCells(newCells);
       setIsSubmitting(false);
     } else {
       // Failed guess
@@ -99,6 +118,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
             )}
             key={cell.id}
             word={cell.word}
+            disabled={isSubmitting}
             data-selected={selectedCells.includes(cell.id)}
             onClick={() => handleCellClick(cell.id)}
           />
