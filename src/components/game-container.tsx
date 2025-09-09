@@ -1,20 +1,14 @@
-import type { Puzzle, PuzzleCell } from '../lib/types';
 import WordCell from './word-cell';
 import GameTimer from './game-timer';
-import { useState } from 'react';
 import CompletedGroup from './completed-group';
-import { cn } from '../lib/util';
-import { useAnimate } from 'motion/react';
-
-function shuffle<T>(arr: T[]): T[] {
-  return arr
-    .map((value) => ({ value, sort: Math.random() }))
-    .sort((a, b) => a.sort - b.sort)
-    .map(({ value }) => value);
-}
+import { useState } from 'react';
+import { cn, shuffle } from '../lib/util';
+import { resolveElements, useAnimate } from 'motion/react';
+import type { Puzzle, PuzzleCell } from '../lib/types';
 
 export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   const [scope, animate] = useAnimate();
+  const [doCellAnimation, setDoCellAnimation] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [guessHistory, setGuessHistory] = useState<number[][]>([]);
   const [mistakes, setMistakes] = useState(0);
@@ -32,13 +26,16 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
     )
   );
 
+  const isMaxSelections = selectedCells.length === 4;
+  const isNoSelections = selectedCells.length === 0;
+
   const handleCellClick = (cellId: number) => {
     if (selectedCells.includes(cellId)) {
       setSelectedCells(selectedCells.filter((id) => id !== cellId));
       return;
     }
 
-    if (selectedCells.length !== 4) {
+    if (!isMaxSelections) {
       setSelectedCells([...selectedCells, cellId].sort());
     }
   };
@@ -48,47 +45,41 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
     const selection = selectedCells.map(
       (id) => cells.find((cell) => cell.id === id)!
     );
-    const selectionElements = document.querySelectorAll(
-      `button[data-selected='true']`
+    const selectionElements = resolveElements(
+      `button[data-selected='true']`,
+      scope
     );
+
+    // Selection confirmation bounce animation
+    selectionElements.forEach((el, i) => {
+      animate(
+        el,
+        { y: [0, -15, 0] },
+        {
+          duration: 0.2,
+          delay: i * 0.08,
+          ease: 'easeInOut',
+        }
+      );
+    });
+    let timeout = 850;
 
     if (
       selection.every((cell) => cell.groupLevel === selection[0].groupLevel)
     ) {
-      // Successful completion
-      // setCompletedGroups([...completedGroups, selection[0].groupLevel]);
-      // setCells(cells.filter((cell) => !selectedCells.includes(cell.id)));
-      // setSelectedCells([]);
-
-      // Confirmation bounce animation
-      selectionElements.forEach((el, i) => {
-        animate(
-          el,
-          { y: [0, -10, 0] },
-          {
-            duration: 0.2,
-            delay: i * 0.1,
-            ease: 'easeInOut',
-            stiffness: 300,
-            damping: 30,
-          }
-        );
-      });
-
-      // Move completed group the the top of the grid
-      let finishSubmitTimeout;
+      // Find grid indices of selected cells not in the first row
       const selectedCellsIndices = selectedCells
         .map((id) => cells.findIndex((c) => c.id === id))
         .filter((index) => index > 3);
 
-      // Only if any need to be moved
+      // If needed, swap selected cells with unselected cells in the top row
       if (selectedCellsIndices.length !== 0) {
-        finishSubmitTimeout = 900;
         setTimeout(() => {
           const newCells = [...cells];
           selectedCellsIndices
             .sort((a, b) => a - b)
             .forEach((from) => {
+              // Get the position of the first unselected cell in the top row
               const to = newCells
                 .map(({ id }, index) => ({ id, index }))
                 .find(({ id }) => !selectedCells.includes(id))!.index;
@@ -97,35 +88,53 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
             });
 
           setCells(newCells);
-        }, finishSubmitTimeout);
-      } else {
-        finishSubmitTimeout = 0;
+        }, timeout);
+        timeout += 400;
       }
 
+      // Prevent cells from animating during removal
       setTimeout(() => {
-        setIsSubmitting(false);
-      }, finishSubmitTimeout);
+        setDoCellAnimation(false);
+      }, timeout);
+      timeout += 100;
+
+      // Successful completion
+      setTimeout(() => {
+        setCells(cells.filter((cell) => !selectedCells.includes(cell.id)));
+        setCompletedGroups([...completedGroups, selection[0].groupLevel]);
+        setSelectedCells([]);
+
+        setDoCellAnimation(true);
+      }, timeout);
+      timeout += 500;
     } else {
       // Failed guess
       setGuessHistory([...guessHistory, selectedCells]);
 
       // Error shake animation
-      setTimeout(() => setIsSubmitting(false), 1500);
       animate(
         selectionElements,
-        { x: [0, -4, 4, -4, 4, -4, 4, 0] },
+        { x: [0, -4, 4, -4, 0] },
         {
-          duration: 1.5,
+          duration: 0.3,
+          delay: timeout / 1000,
           ease: 'easeInOut',
-          times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1],
         }
       );
-      setMistakes((prev) => prev + 1);
+      timeout += 400;
+
+      // Wait for animations to increment mistakes
+      setTimeout(() => {
+        setMistakes((prev) => prev + 1);
+      }, timeout);
+
       // Game over
       // if (mistakes < 3) {
       //   return;
       // }
     }
+
+    setTimeout(() => setIsSubmitting(false), timeout);
   };
 
   return (
@@ -141,7 +150,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       {/* Word grid */}
       <div
         ref={scope}
-        className="grid h-[calc(3*8px+4*23vw)] grid-cols-4 gap-2 md:mx-auto md:h-[calc(3*8px+4*80px)]"
+        className="grid h-[calc(3*8px+4*23vw)] grid-cols-4 gap-2 md:mx-auto md:h-auto"
       >
         {completedGroups.map((level) => (
           <CompletedGroup
@@ -149,15 +158,20 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
             group={puzzle.answers.find((g) => g.level === level)!}
           />
         ))}
-        {cells.map((cell) => (
-          <WordCell
-            key={cell.id}
-            word={cell.word}
-            disabled={isSubmitting}
-            data-selected={selectedCells.includes(cell.id)}
-            onClick={() => handleCellClick(cell.id)}
-          />
-        ))}
+        {cells.map(({ id, word }) => {
+          const selected = selectedCells.includes(id);
+
+          return (
+            <WordCell
+              key={id}
+              doAnimation={doCellAnimation}
+              word={word}
+              disabled={isSubmitting || (isMaxSelections && !selected)}
+              data-selected={selected}
+              onClick={() => handleCellClick(id)}
+            />
+          );
+        })}
       </div>
       {/* Mistake counter */}
       <div className="flex items-center justify-center gap-2 text-darkest-beige">
@@ -175,7 +189,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       {/* Game control buttons */}
       <div className="flex justify-center gap-4">
         <button
-          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold"
+          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
           disabled={isSubmitting}
           onClick={() => setCells((prev) => shuffle(prev))}
         >
@@ -183,7 +197,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         </button>
         <button
           className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
-          disabled={selectedCells.length === 0 || isSubmitting}
+          disabled={isNoSelections || isSubmitting}
           onClick={() => setSelectedCells([])}
         >
           Deselect
@@ -191,7 +205,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         <button
           className="h-12 w-32 cursor-pointer rounded-4xl bg-black font-semibold text-white transition-colors disabled:cursor-auto disabled:border-[1px] disabled:border-gray-500 disabled:bg-inherit disabled:text-gray-500"
           disabled={
-            selectedCells.length !== 4 ||
+            !isMaxSelections ||
             isSubmitting ||
             guessHistory.some(
               (hist) => JSON.stringify(hist) === JSON.stringify(selectedCells)
