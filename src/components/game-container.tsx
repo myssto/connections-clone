@@ -295,15 +295,16 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         {/* Mistake counter */}
         <div className="flex items-center justify-center gap-2 text-darkest-beige">
           <span>Mistakes Remaining:</span>
-          {[...Array(4).keys()].reverse().map((i) => (
-            <span
-              className={cn(
-                'size-4 rounded-full',
-                i >= mistakes ? 'bg-darkest-beige' : 'bg-inherit'
-              )}
-              key={i}
-            />
-          ))}
+          {Array.from({ length: 4 }, (_, i) => i)
+            .reverse()
+            .map((i) => (
+              <motion.span
+                key={i}
+                className="size-4 rounded-full bg-darkest-beige"
+                animate={i < mistakes ? { scale: [1, 1.25, 0] } : undefined}
+                transition={{ duration: 0.35 }}
+              />
+            ))}
         </div>
         {/* Game control buttons */}
         <div className="flex justify-center gap-4">
