@@ -2,7 +2,7 @@ import WordCell from './word-cell';
 import CompletedGroup from './completed-group';
 import { useEffect, useState } from 'react';
 import { cn, groupBgColors, shuffle } from '../lib/util';
-import { resolveElements, useAnimate } from 'motion/react';
+import { resolveElements, useAnimate, motion } from 'motion/react';
 import type { Puzzle, PuzzleCell } from '../lib/types';
 import { useTimer } from '../lib/hooks';
 
@@ -163,8 +163,16 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         {gameOver && (
           <>
             {/* Blur */}
-            <div className="absolute -inset-12 backdrop-blur-sm" />
-            <div className="absolute inset-0 flex flex-col items-center gap-2 p-2 text-shadow-md text-shadow-neutral-800/20">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute -inset-12 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 flex flex-col items-center gap-2 p-2 text-shadow-md text-shadow-neutral-800/20"
+            >
               {/* Header */}
               <span className="font-karnak-condensed text-3xl">
                 {gameWon ? 'Congratulations!' : 'Next Time!'}
@@ -253,7 +261,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
                   })
                 )}
               </div>
-            </div>
+            </motion.div>
           </>
         )}
         {/* Word grid */}
