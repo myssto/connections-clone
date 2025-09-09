@@ -11,3 +11,5 @@ export function shuffle<T>(arr: T[]): T[] {
     .sort((a, b) => a.sort - b.sort)
     .map(({ value }) => value);
 }
+
+export const groupBgColors = ['bg-yellow', 'bg-green', 'bg-blue', 'bg-maroon'];

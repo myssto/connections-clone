@@ -34,6 +34,13 @@
 }
 
 @font-face {
+  font-family: nyt-karnak;
+  font-style: normal;
+  font-weight: 500;
+  src: url('/fonts/karnak-normal-500.woff2') format('woff2');
+}
+
+@font-face {
   font-family: nyt-karnakcondensed;
   font-style: normal;
   font-weight: 700;

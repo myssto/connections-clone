@@ -1,8 +1,6 @@
-import { cn } from '../lib/util';
+import { cn, groupBgColors } from '../lib/util';
 import { motion } from 'motion/react';
 import type { PuzzleAnswerGroup } from '../lib/types';
-
-const bgColors = ['bg-yellow', 'bg-green', 'bg-blue', 'bg-maroon'];
 
 export default function CompletedGroup({
   group,
@@ -12,11 +10,11 @@ export default function CompletedGroup({
   return (
     <motion.div
       className={cn(
-        'col-span-full flex flex-col justify-center rounded-lg text-xs shadow-2xs *:opacity-(--child-opacity) sm:text-lg md:h-20 md:text-xl',
-        bgColors[group.level]
+        'col-span-full flex flex-col justify-center rounded-lg text-xs shadow-2xs *:opacity-(--child-opacity) sm:text-lg md:h-20 md:min-w-[600px] md:text-xl',
+        groupBgColors[group.level]
       )}
       animate={{
-        scale: [1, 1.3, 1.3, 1],
+        scale: [1, 1.2, 1.2, 1],
         ['--child-opacity']: [0, 1, 1, 1],
         transition: {
           duration: 0.5,

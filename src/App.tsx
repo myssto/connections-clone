@@ -40,7 +40,7 @@ export default function App() {
           <>
             <GameContainer puzzle={puzzle} key={resetKey} />
             {/* Meta control buttons */}
-            <div className="flex justify-center gap-4">
+            <div className="z-10 flex justify-center gap-4">
               <button
                 className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold"
                 onClick={handleResetGame}

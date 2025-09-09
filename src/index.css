@@ -3,7 +3,8 @@
 
 @theme {
   --font-franklin: nyt-franklin, Arial;
-  --font-karnak-condensed: nyt-karnakcondensed;
+  --font-karnak: nyt-karnak, Georgia;
+  --font-karnak-condensed: nyt-karnakcondensed, Georgia;
 
   --color-cool-grey: #f8f8f8;
   --color-lightest-beige: #ececdb;
