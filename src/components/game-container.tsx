@@ -4,6 +4,7 @@ import GameTimer from './game-timer';
 import { useState } from 'react';
 import CompletedGroup from './completed-group';
 import { cn } from '../lib/util';
+import { useAnimate } from 'motion/react';
 
 function shuffle<T>(arr: T[]): T[] {
   return arr
@@ -13,8 +14,8 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
+  const [scope, animate] = useAnimate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGuessIncorrect, setIsGuessIncorrect] = useState(false);
   const [guessHistory, setGuessHistory] = useState<number[][]>([]);
   const [mistakes, setMistakes] = useState(0);
   const [completedGroups, setCompletedGroups] = useState<number[]>([]);
@@ -47,6 +48,9 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
     const selection = selectedCells.map(
       (id) => cells.find((cell) => cell.id === id)!
     );
+    const selectionElements = document.querySelectorAll(
+      `button[data-selected='true']`
+    );
 
     if (
       selection.every((cell) => cell.groupLevel === selection[0].groupLevel)
@@ -56,39 +60,72 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       // setCells(cells.filter((cell) => !selectedCells.includes(cell.id)));
       // setSelectedCells([]);
 
-      // Move completed group the the top of the grid
-      const newCells = [...cells];
-
-      const selectedSwap = selectedCells
-        .map((id) => cells.findIndex((c) => c.id === id))
-        .filter((i) => i > 3);
-
-      const currentSwap = cells
-        .slice(0, 3)
-        .map(({ id }, index) => ({ id, index }))
-        .filter(({ id }) => !selectedCells.includes(id))
-        .map(({ index }) => index);
-
-      selectedSwap.forEach((from, i) => {
-        const to = currentSwap[i];
-        [newCells[from], newCells[to]] = [newCells[to], newCells[from]];
+      // Confirmation bounce animation
+      selectionElements.forEach((el, i) => {
+        animate(
+          el,
+          { y: [0, -10, 0] },
+          {
+            duration: 0.2,
+            delay: i * 0.1,
+            ease: 'easeInOut',
+            stiffness: 300,
+            damping: 30,
+          }
+        );
       });
 
-      setCells(newCells);
-      setIsSubmitting(false);
+      // Move completed group the the top of the grid
+      let finishSubmitTimeout;
+      const selectedCellsIndices = selectedCells
+        .map((id) => cells.findIndex((c) => c.id === id))
+        .filter((index) => index > 3);
+
+      // Only if any need to be moved
+      if (selectedCellsIndices.length !== 0) {
+        finishSubmitTimeout = 900;
+        setTimeout(() => {
+          const newCells = [...cells];
+          selectedCellsIndices
+            .sort((a, b) => a - b)
+            .forEach((from) => {
+              const to = newCells
+                .map(({ id }, index) => ({ id, index }))
+                .find(({ id }) => !selectedCells.includes(id))!.index;
+
+              [newCells[from], newCells[to]] = [cells[to], cells[from]];
+            });
+
+          setCells(newCells);
+        }, finishSubmitTimeout);
+      } else {
+        finishSubmitTimeout = 0;
+      }
+
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, finishSubmitTimeout);
     } else {
       // Failed guess
       setGuessHistory([...guessHistory, selectedCells]);
-      setIsGuessIncorrect(true);
-      setTimeout(() => setIsGuessIncorrect(false), 500);
+
+      // Error shake animation
+      setTimeout(() => setIsSubmitting(false), 1500);
+      animate(
+        selectionElements,
+        { x: [0, -4, 4, -4, 4, -4, 4, 0] },
+        {
+          duration: 1.5,
+          ease: 'easeInOut',
+          times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1],
+        }
+      );
       setMistakes((prev) => prev + 1);
       // Game over
       // if (mistakes < 3) {
       //   return;
       // }
     }
-
-    setTimeout(() => setIsSubmitting(false), 500);
   };
 
   return (
@@ -102,7 +139,10 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         <GameTimer enabled />
       </div>
       {/* Word grid */}
-      <div className="grid h-[calc(3*8px+4*23vw)] grid-cols-4 gap-2 md:mx-auto md:h-[calc(3*8px+4*80px)]">
+      <div
+        ref={scope}
+        className="grid h-[calc(3*8px+4*23vw)] grid-cols-4 gap-2 md:mx-auto md:h-[calc(3*8px+4*80px)]"
+      >
         {completedGroups.map((level) => (
           <CompletedGroup
             key={level}
@@ -111,11 +151,6 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         ))}
         {cells.map((cell) => (
           <WordCell
-            className={cn(
-              isGuessIncorrect
-                ? 'data-[selected="true"]:animate-shake-error'
-                : ''
-            )}
             key={cell.id}
             word={cell.word}
             disabled={isSubmitting}
