@@ -1,4 +1,5 @@
 import GameContainer from './components/game-container';
+import Footer from './components/footer';
 import connectionsLogo from '/logo.svg';
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useTimer, usePuzzles } from './lib/hooks';
@@ -35,7 +36,7 @@ export default function App() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-[1050px] p-2 text-center md:p-4">
+    <main className="mx-auto flex h-full w-full max-w-[1050px] flex-col items-center p-2 py-4 text-center md:p-4 md:py-6">
       <div className="mb-1 flex items-end justify-center gap-1">
         <img src={connectionsLogo} alt="Connections logo" className="size-14" />
         <h1 className="font-karnak-condensed text-5xl">Connections</h1>
@@ -90,6 +91,7 @@ export default function App() {
           </>
         )}
       </div>
+      <Footer />
     </main>
   );
 }
