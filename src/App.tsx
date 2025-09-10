@@ -1,8 +1,7 @@
 import GameContainer from './components/game-container';
 import connectionsLogo from '/logo.svg';
-import { usePuzzles } from './lib/data';
 import { useEffect, useState, type ChangeEvent } from 'react';
-import { useTimer } from './lib/hooks';
+import { useTimer, usePuzzles } from './lib/hooks';
 import type { Puzzle } from './lib/types';
 
 export default function App() {
@@ -56,11 +55,13 @@ export default function App() {
                 onChange={handleSelectPuzzle}
                 value={puzzle.id}
               >
-                {puzzles.map(({ id, date }) => (
-                  <option key={id} value={id}>
-                    Puzzle #{id} ({date})
-                  </option>
-                ))}
+                {puzzles
+                  .map(({ id, date }) => (
+                    <option key={id} value={id}>
+                      Puzzle #{id} ({date})
+                    </option>
+                  ))
+                  .reverse()}
               </select>
               {/* Timer */}
               <span>{formattedTime}</span>
