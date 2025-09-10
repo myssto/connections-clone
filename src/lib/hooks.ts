@@ -25,5 +25,6 @@ export function useTimer() {
     time,
     formattedTime: formatTime(time),
     disableTimer: () => setIsActive(false),
+    resetTimer: () => setTime(0),
   };
 }

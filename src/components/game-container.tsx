@@ -8,7 +8,6 @@ import {
   motion,
   AnimatePresence,
 } from 'motion/react';
-import { useTimer } from '../lib/hooks';
 import GameEndOverlay from './game-end-overlay';
 import type {
   GuessHistoryEntry,
@@ -17,7 +16,15 @@ import type {
   PuzzleGroupLevel,
 } from '../lib/types';
 
-export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
+export default function GameContainer({
+  puzzle,
+  time,
+  disableTimer,
+}: {
+  puzzle: Puzzle;
+  time: number;
+  disableTimer: () => void;
+}) {
   // Animation state
   const [scope, animate] = useAnimate();
   const [doCellAnimation, setDoCellAnimation] = useState(true);
@@ -26,7 +33,6 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   // Game state
   const [gameOver, setGameOver] = useState(false);
   const [showResults, setShowResults] = useState(true);
-  const { time, formattedTime, disableTimer } = useTimer();
   const [cells, setCells] = useState<PuzzleCell[]>(
     shuffle(
       puzzle.answers.flatMap((group) =>
@@ -222,115 +228,105 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   };
 
   return (
-    <>
-      {/* Id + timer */}
-      <div className="mx-1 mb-2 flex justify-between">
-        <span className="flex items-center gap-1">
-          Puzzle #{puzzle.id}
-          <span className="text-sm text-gray-500">({puzzle.date})</span>
-        </span>
-        <span>{formattedTime}</span>
-      </div>
-      <div className="relative flex flex-col space-y-4">
-        {/* End of game overlay */}
-        <AnimatePresence>
-          {gameOver && showResults && (
-            <GameEndOverlay
-              puzzleId={puzzle.id}
-              won={gameWon}
-              time={time}
-              mistakes={mistakes}
-              completedGroupsCount={completedGroupsCount}
-              guessHistory={guessHistory}
-              onExit={() => setShowResults(false)}
+    <div className="relative flex flex-col space-y-4">
+      {/* End of game overlay */}
+      <AnimatePresence>
+        {gameOver && showResults && (
+          <GameEndOverlay
+            puzzleId={puzzle.id}
+            won={gameWon}
+            time={time}
+            mistakes={mistakes}
+            completedGroupsCount={completedGroupsCount}
+            guessHistory={guessHistory}
+            onExit={() => setShowResults(false)}
+          />
+        )}
+      </AnimatePresence>
+      {/* Word grid */}
+      <div
+        ref={scope}
+        className="mb-2 grid h-[calc(3*8px+4*23vw)] grid-cols-4 gap-2 md:mx-auto md:h-auto"
+      >
+        {displayGroups.map((level) => (
+          <CompletedGroup
+            key={level}
+            group={puzzle.answers.find((g) => g.level === level)!}
+          />
+        ))}
+        {cells.map(({ id, word }) => {
+          const selected = selectedCellIds.includes(id);
+
+          return (
+            <WordCell
+              key={id}
+              doAnimation={doCellAnimation}
+              word={word}
+              disabled={
+                isAnimating || (isMaxSelections && !selected) || gameOver
+              }
+              data-selected={selected}
+              onClick={() => handleCellClick(id)}
             />
-          )}
-        </AnimatePresence>
-        {/* Word grid */}
-        <div
-          ref={scope}
-          className="mb-2 grid h-[calc(3*8px+4*23vw)] grid-cols-4 gap-2 md:mx-auto md:h-auto"
-        >
-          {displayGroups.map((level) => (
-            <CompletedGroup
-              key={level}
-              group={puzzle.answers.find((g) => g.level === level)!}
+          );
+        })}
+      </div>
+      {/* Mistake counter */}
+      <div className="flex items-center justify-center gap-2 text-darkest-beige">
+        <span>Mistakes Remaining:</span>
+        {Array.from({ length: 4 }, (_, i) => i)
+          .reverse()
+          .map((i) => (
+            <motion.span
+              key={i}
+              className="size-4 rounded-full bg-darkest-beige"
+              animate={i < mistakes ? { scale: [1, 1.25, 0] } : undefined}
+              transition={{ duration: 0.35 }}
             />
           ))}
-          {cells.map(({ id, word }) => {
-            const selected = selectedCellIds.includes(id);
-
-            return (
-              <WordCell
-                key={id}
-                doAnimation={doCellAnimation}
-                word={word}
-                disabled={
-                  isAnimating || (isMaxSelections && !selected) || gameOver
-                }
-                data-selected={selected}
-                onClick={() => handleCellClick(id)}
-              />
-            );
-          })}
-        </div>
-        {/* Mistake counter */}
-        <div className="flex items-center justify-center gap-2 text-darkest-beige">
-          <span>Mistakes Remaining:</span>
-          {Array.from({ length: 4 }, (_, i) => i)
-            .reverse()
-            .map((i) => (
-              <motion.span
-                key={i}
-                className="size-4 rounded-full bg-darkest-beige"
-                animate={i < mistakes ? { scale: [1, 1.25, 0] } : undefined}
-                transition={{ duration: 0.35 }}
-              />
-            ))}
-        </div>
-        {/* Game control buttons */}
-        <div className="flex flex-wrap justify-center gap-4">
-          <button
-            className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
-            disabled={isAnimating || gameOver}
-            onClick={() => setCells((prev) => shuffle(prev))}
-          >
-            Shuffle
-          </button>
-          <button
-            className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
-            disabled={isNoSelections || isAnimating || gameOver}
-            onClick={() => setSelectedCellIds([])}
-          >
-            Deselect
-          </button>
-          <button
-            className="h-12 w-32 cursor-pointer rounded-4xl bg-black font-semibold text-white transition-colors disabled:cursor-auto disabled:border-[1px] disabled:border-gray-500 disabled:bg-inherit disabled:text-gray-500"
-            disabled={
-              !isMaxSelections ||
-              isAnimating ||
-              gameOver ||
-              guessHistory.some(
-                (hist) =>
-                  JSON.stringify(hist.map(({ id }) => id)) ===
-                  JSON.stringify(selectedCellIds)
-              )
-            }
-            onClick={handleSubmit}
-          >
-            Submit
-          </button>
-          {!isAnimating && gameOver && (
-            <button
-              className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
-              disabled={showResults}
-              onClick={() => setShowResults(true)}
-            >
-              View Results
-            </button>
-          )}
-        </div>
       </div>
-    </>
+      {/* Game control buttons */}
+      <div className="flex flex-wrap justify-center gap-4">
+        <button
+          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
+          disabled={isAnimating || gameOver}
+          onClick={() => setCells((prev) => shuffle(prev))}
+        >
+          Shuffle
+        </button>
+        <button
+          className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
+          disabled={isNoSelections || isAnimating || gameOver}
+          onClick={() => setSelectedCellIds([])}
+        >
+          Deselect
+        </button>
+        <button
+          className="h-12 w-32 cursor-pointer rounded-4xl bg-black font-semibold text-white transition-colors disabled:cursor-auto disabled:border-[1px] disabled:border-gray-500 disabled:bg-inherit disabled:text-gray-500"
+          disabled={
+            !isMaxSelections ||
+            isAnimating ||
+            gameOver ||
+            guessHistory.some(
+              (hist) =>
+                JSON.stringify(hist.map(({ id }) => id)) ===
+                JSON.stringify(selectedCellIds)
+            )
+          }
+          onClick={handleSubmit}
+        >
+          Submit
+        </button>
+        {!isAnimating && gameOver && (
+          <button
+            className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
+            disabled={showResults}
+            onClick={() => setShowResults(true)}
+          >
+            View Results
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
