@@ -4,14 +4,10 @@ export type Puzzle = {
   answers: PuzzleAnswerGroup[];
 };
 
+export type PuzzleGroupLevel = 0 | 1 | 2 | 3;
+
 export type PuzzleAnswerGroup = {
-  level: number;
+  level: PuzzleGroupLevel;
   group: string;
   members: string[];
-};
-
-export type PuzzleCell = {
-  id: number;
-  groupLevel: number;
-  word: string;
 };

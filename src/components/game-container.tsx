@@ -1,10 +1,16 @@
 import WordCell from './word-cell';
 import CompletedGroup from './completed-group';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { cn, groupBgColors, shuffle } from '../lib/util';
 import { resolveElements, useAnimate, motion } from 'motion/react';
-import type { Puzzle, PuzzleCell } from '../lib/types';
+import type { Puzzle, PuzzleGroupLevel } from '../lib/types';
 import { useTimer } from '../lib/hooks';
+
+type PuzzleCell = {
+  id: number;
+  groupLevel: PuzzleGroupLevel;
+  word: string;
+};
 
 export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   const initialCells = shuffle(
@@ -17,135 +23,173 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
     )
   );
 
+  // Animation state
   const [scope, animate] = useAnimate();
   const [doCellAnimation, setDoCellAnimation] = useState(true);
-  const { time, formattedTime, disableTimer } = useTimer();
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // Game state
   const [gameOver, setGameOver] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { time, formattedTime, disableTimer } = useTimer();
+  const [cells, setCells] = useState<PuzzleCell[]>(initialCells);
+  const [selectedCellIds, setSelectedCellIds] = useState<number[]>([]);
   const [guessHistory, setGuessHistory] = useState<number[][]>([]);
   const [mistakes, setMistakes] = useState(0);
-  const [completedGroups, setCompletedGroups] = useState<number[]>([]);
-  const [selectedCells, setSelectedCells] = useState<number[]>([]);
-  const [cells, setCells] = useState<PuzzleCell[]>(initialCells);
+  const [displayGroups, setDisplayGroups] = useState<PuzzleGroupLevel[]>([]);
+  const [completedGroupsCount, setCompletedGroupsCount] = useState(0);
 
   const gameWon = mistakes < 4;
-  const nCompletedGroups = completedGroups.length;
-  const isMaxSelections = selectedCells.length === 4;
-  const isNoSelections = selectedCells.length === 0;
+  const isMaxSelections = selectedCellIds.length === 4;
+  const isNoSelections = selectedCellIds.length === 0;
+
+  // -- Animations --
+  const animateCellConfirmation = async (els: Element[]) => {
+    await els
+      .map((el, i) =>
+        animate(
+          el,
+          { y: [0, -15, 0] },
+          {
+            duration: 0.2,
+            delay: i * 0.08,
+            ease: 'easeInOut',
+          }
+        )
+      )
+      .at(-1)!.finished;
+
+    // Brief pause before next animation
+    await new Promise((res) => setTimeout(res, 300));
+  };
+
+  const animateCellMistake = async (els: Element[]) => {
+    await animate(
+      els,
+      { x: [0, -4, 4, -4, 0] },
+      {
+        duration: 0.3,
+        ease: 'easeInOut',
+      }
+    ).finished;
+  };
+
+  const animateCompletedGroup = useCallback(
+    async (groupLevel: PuzzleGroupLevel) => {
+      // Find grid indices of cells not in the first row
+      const cellIndices = cells
+        .map(({ groupLevel: level }, index) => ({ level, index }))
+        .filter(({ level, index }) => level === groupLevel && index > 3)
+        .map(({ index }) => index);
+
+      // Move all group cells to the top row
+      if (cellIndices.length > 0) {
+        const newCells = [...cells];
+        cellIndices
+          .sort((a, b) => a - b)
+          .forEach((from) => {
+            // Get the position of the first unselected cell in the top row
+            const to = newCells
+              .map(({ id }, index) => ({ id, index }))
+              .find(({ id }) => !selectedCellIds.includes(id))!.index;
+
+            [newCells[from], newCells[to]] = [cells[to], cells[from]];
+          });
+
+        setCells(newCells);
+
+        // Wait for the swap animation to finish
+        await new Promise((res) => setTimeout(res, 400));
+      }
+
+      // Prevent cells from animating during removal
+      setDoCellAnimation(false);
+      await new Promise((res) => setTimeout(res, 100));
+
+      // Remove the group cells, add the completed group to the grid
+      setCells((prev) => prev.filter((cell) => cell.groupLevel !== groupLevel));
+      setDisplayGroups((prev) => [...prev, groupLevel]);
+
+      // Wait for completed group entrance animation
+      await new Promise((res) => setTimeout(res, 500));
+      setDoCellAnimation(true);
+    },
+    [cells, selectedCellIds]
+  );
+
+  // Handle game over
+  const handleGameOver = useCallback(async () => {
+    setIsAnimating(true);
+    disableTimer();
+
+    // Reveal answers
+    if (!gameWon) {
+      setSelectedCellIds([]);
+      do {
+        await animateCompletedGroup(cells[0].groupLevel);
+        await new Promise((res) => setTimeout(res, 500));
+      } while (cells.length > 0);
+    }
+
+    await new Promise((res) => setTimeout(res, 100));
+    setIsAnimating(false);
+    setGameOver(true);
+  }, [animateCompletedGroup, cells, disableTimer, gameWon]);
 
   useEffect(() => {
-    if (isSubmitting) {
+    if (isAnimating || gameOver) {
       return;
     }
 
-    if (nCompletedGroups === 4 || mistakes === 4) {
-      setGameOver(true);
-      disableTimer();
+    if (completedGroupsCount !== 4 && mistakes !== 4) {
+      return;
     }
-  }, [isSubmitting, nCompletedGroups, mistakes, disableTimer]);
 
+    handleGameOver();
+  }, [completedGroupsCount, gameOver, handleGameOver, isAnimating, mistakes]);
+
+  // -- Events --
   const handleCellClick = (cellId: number) => {
-    if (selectedCells.includes(cellId)) {
-      setSelectedCells(selectedCells.filter((id) => id !== cellId));
+    if (selectedCellIds.includes(cellId)) {
+      setSelectedCellIds(selectedCellIds.filter((id) => id !== cellId));
       return;
     }
 
     if (!isMaxSelections) {
-      setSelectedCells([...selectedCells, cellId].sort());
+      setSelectedCellIds([...selectedCellIds, cellId].sort());
     }
   };
 
-  const handleSubmit = () => {
-    setIsSubmitting(true);
-    setGuessHistory([...guessHistory, selectedCells]);
+  const handleSubmit = async () => {
+    setIsAnimating(true);
+    setGuessHistory([...guessHistory, selectedCellIds]);
 
-    const selection = selectedCells.map(
+    const selectedCells = selectedCellIds.map(
       (id) => cells.find((cell) => cell.id === id)!
     );
-    const selectionElements = resolveElements(
+    const selectedGroupLevel = selectedCells[0].groupLevel;
+    const selectedCellEls = resolveElements(
       `button[data-selected='true']`,
       scope
     );
 
     // Selection confirmation bounce animation
-    selectionElements.forEach((el, i) => {
-      animate(
-        el,
-        { y: [0, -15, 0] },
-        {
-          duration: 0.2,
-          delay: i * 0.08,
-          ease: 'easeInOut',
-        }
-      );
-    });
-    let timeout = 850;
+    await animateCellConfirmation(selectedCellEls);
 
     if (
-      selection.every((cell) => cell.groupLevel === selection[0].groupLevel)
+      selectedCells.every(({ groupLevel }) => groupLevel === selectedGroupLevel)
     ) {
-      // Find grid indices of selected cells not in the first row
-      const selectedCellsIndices = selectedCells
-        .map((id) => cells.findIndex((c) => c.id === id))
-        .filter((index) => index > 3);
-
-      // If needed, swap selected cells with unselected cells in the top row
-      if (selectedCellsIndices.length !== 0) {
-        setTimeout(() => {
-          const newCells = [...cells];
-          selectedCellsIndices
-            .sort((a, b) => a - b)
-            .forEach((from) => {
-              // Get the position of the first unselected cell in the top row
-              const to = newCells
-                .map(({ id }, index) => ({ id, index }))
-                .find(({ id }) => !selectedCells.includes(id))!.index;
-
-              [newCells[from], newCells[to]] = [cells[to], cells[from]];
-            });
-
-          setCells(newCells);
-        }, timeout);
-        timeout += 400;
-      }
-
-      // Prevent cells from animating during removal
-      setTimeout(() => {
-        setDoCellAnimation(false);
-      }, timeout);
-      timeout += 100;
-
       // Successful completion
-      setTimeout(() => {
-        setCells(cells.filter((cell) => !selectedCells.includes(cell.id)));
-        setCompletedGroups([...completedGroups, selection[0].groupLevel]);
-        setSelectedCells([]);
-
-        setDoCellAnimation(true);
-      }, timeout);
-      timeout += 500;
+      await animateCompletedGroup(selectedGroupLevel);
+      setSelectedCellIds([]);
+      setCompletedGroupsCount((prev) => prev + 1);
     } else {
-      // Error shake animation
-      animate(
-        selectionElements,
-        { x: [0, -4, 4, -4, 0] },
-        {
-          duration: 0.3,
-          delay: timeout / 1000,
-          ease: 'easeInOut',
-        }
-      );
-      timeout += 400;
-
-      // Wait for animations to increment mistakes
-      setTimeout(() => {
-        setMistakes((prev) => prev + 1);
-      }, timeout);
+      // Mistake
+      await animateCellMistake(selectedCellEls);
+      setMistakes((prev) => prev + 1);
     }
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-    }, timeout + 100);
+    await new Promise((res) => setTimeout(res, 100));
+    setIsAnimating(false);
   };
 
   return (
@@ -223,20 +267,20 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
                     <span
                       className={cn(
                         'font-semibold text-rose-600',
-                        completedGroups.length > 1 && 'text-emerald-800',
-                        completedGroups.length === 4 && 'text-yellow-500 italic'
+                        displayGroups.length > 1 && 'text-emerald-800',
+                        displayGroups.length === 4 && 'text-yellow-500 italic'
                       )}
                     >
-                      {completedGroups.length === 0 && 'no groups'}
-                      {completedGroups.length >= 1 &&
-                        `${completedGroups.length} groups`}{' '}
+                      {displayGroups.length === 0 && 'no groups'}
+                      {displayGroups.length >= 1 &&
+                        `${displayGroups.length} groups`}{' '}
                     </span>
                     before running out of chances...{' '}
-                    {completedGroups.length === 0 && 'Tough luck!'}
-                    {completedGroups.length > 0 &&
-                      completedGroups.length < 4 &&
+                    {displayGroups.length === 0 && 'Tough luck!'}
+                    {displayGroups.length > 0 &&
+                      displayGroups.length < 4 &&
                       'Better luck next time!'}
-                    {completedGroups.length === 4 &&
+                    {displayGroups.length === 4 &&
                       'So close! You almost had it!'}
                   </>
                 )}
@@ -269,14 +313,14 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
           ref={scope}
           className="mb-2 grid h-[calc(3*8px+4*23vw)] grid-cols-4 gap-2 md:mx-auto md:h-auto"
         >
-          {completedGroups.map((level) => (
+          {displayGroups.map((level) => (
             <CompletedGroup
               key={level}
               group={puzzle.answers.find((g) => g.level === level)!}
             />
           ))}
           {cells.map(({ id, word }) => {
-            const selected = selectedCells.includes(id);
+            const selected = selectedCellIds.includes(id);
 
             return (
               <WordCell
@@ -284,7 +328,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
                 doAnimation={doCellAnimation}
                 word={word}
                 disabled={
-                  isSubmitting || (isMaxSelections && !selected) || gameOver
+                  isAnimating || (isMaxSelections && !selected) || gameOver
                 }
                 data-selected={selected}
                 onClick={() => handleCellClick(id)}
@@ -310,15 +354,15 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
         <div className="flex justify-center gap-4">
           <button
             className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
-            disabled={isSubmitting || gameOver}
+            disabled={isAnimating || gameOver}
             onClick={() => setCells((prev) => shuffle(prev))}
           >
             Shuffle
           </button>
           <button
             className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
-            disabled={isNoSelections || isSubmitting || gameOver}
-            onClick={() => setSelectedCells([])}
+            disabled={isNoSelections || isAnimating || gameOver}
+            onClick={() => setSelectedCellIds([])}
           >
             Deselect
           </button>
@@ -326,10 +370,11 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
             className="h-12 w-32 cursor-pointer rounded-4xl bg-black font-semibold text-white transition-colors disabled:cursor-auto disabled:border-[1px] disabled:border-gray-500 disabled:bg-inherit disabled:text-gray-500"
             disabled={
               !isMaxSelections ||
-              isSubmitting ||
+              isAnimating ||
               gameOver ||
               guessHistory.some(
-                (hist) => JSON.stringify(hist) === JSON.stringify(selectedCells)
+                (hist) =>
+                  JSON.stringify(hist) === JSON.stringify(selectedCellIds)
               )
             }
             onClick={handleSubmit}
