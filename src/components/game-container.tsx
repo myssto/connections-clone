@@ -1,7 +1,7 @@
 import WordCell from './word-cell';
 import CompletedGroup from './completed-group';
-import { useCallback, useEffect, useState } from 'react';
-import { cn, groupBgColors, shuffle } from '../lib/util';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { cn, groupBgColors, shuffle, sleep } from '../lib/util';
 import { resolveElements, useAnimate, motion } from 'motion/react';
 import type { Puzzle, PuzzleGroupLevel } from '../lib/types';
 import { useTimer } from '../lib/hooks';
@@ -32,6 +32,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   const [gameOver, setGameOver] = useState(false);
   const { time, formattedTime, disableTimer } = useTimer();
   const [cells, setCells] = useState<PuzzleCell[]>(initialCells);
+  const cellsRef = useRef(cells);
   const [selectedCellIds, setSelectedCellIds] = useState<number[]>([]);
   const [guessHistory, setGuessHistory] = useState<number[][]>([]);
   const [mistakes, setMistakes] = useState(0);
@@ -41,6 +42,10 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   const gameWon = mistakes < 4;
   const isMaxSelections = selectedCellIds.length === 4;
   const isNoSelections = selectedCellIds.length === 0;
+
+  useEffect(() => {
+    cellsRef.current = cells;
+  }, [cells]);
 
   // -- Animations --
   const animateCellConfirmation = async (els: Element[]) => {
@@ -59,7 +64,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       .at(-1)!.finished;
 
     // Brief pause before next animation
-    await new Promise((res) => setTimeout(res, 300));
+    await sleep(300);
   };
 
   const animateCellMistake = async (els: Element[]) => {
@@ -76,44 +81,53 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   const animateCompletedGroup = useCallback(
     async (groupLevel: PuzzleGroupLevel) => {
       // Find grid indices of cells not in the first row
-      const cellIndices = cells
-        .map(({ groupLevel: level }, index) => ({ level, index }))
-        .filter(({ level, index }) => level === groupLevel && index > 3)
-        .map(({ index }) => index);
+      setCells((prev) => {
+        const groupCells = prev
+          .map((cell, index) => ({ ...cell, index }))
+          .filter(({ groupLevel: level }) => level === groupLevel);
 
-      // Move all group cells to the top row
-      if (cellIndices.length > 0) {
-        const newCells = [...cells];
-        cellIndices
+        const cellIndicesToSwap = groupCells
+          .filter(({ index }) => index > 3)
+          .map(({ index }) => index);
+
+        // Move all group cells to the top row
+        if (cellIndicesToSwap.length === 0) {
+          return prev;
+        }
+
+        const newCells = [...prev];
+        cellIndicesToSwap
           .sort((a, b) => a - b)
           .forEach((from) => {
             // Get the position of the first unselected cell in the top row
             const to = newCells
               .map(({ id }, index) => ({ id, index }))
-              .find(({ id }) => !selectedCellIds.includes(id))!.index;
+              .find(({ id: toId }) =>
+                groupCells.every(({ id }) => toId !== id)
+              )!.index;
 
-            [newCells[from], newCells[to]] = [cells[to], cells[from]];
+            [newCells[from], newCells[to]] = [prev[to], prev[from]];
           });
 
-        setCells(newCells);
+        return newCells;
+      });
 
-        // Wait for the swap animation to finish
-        await new Promise((res) => setTimeout(res, 400));
-      }
+      // Wait for the swap animation to finish
+      await sleep(400);
 
       // Prevent cells from animating during removal
       setDoCellAnimation(false);
-      await new Promise((res) => setTimeout(res, 100));
+      await sleep(100);
 
       // Remove the group cells, add the completed group to the grid
       setCells((prev) => prev.filter((cell) => cell.groupLevel !== groupLevel));
       setDisplayGroups((prev) => [...prev, groupLevel]);
 
       // Wait for completed group entrance animation
-      await new Promise((res) => setTimeout(res, 500));
+      await sleep(500);
       setDoCellAnimation(true);
     },
-    [cells, selectedCellIds]
+    []
   );
 
   // Handle game over
@@ -124,16 +138,22 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
     // Reveal answers
     if (!gameWon) {
       setSelectedCellIds([]);
-      do {
-        await animateCompletedGroup(cells[0].groupLevel);
-        await new Promise((res) => setTimeout(res, 500));
-      } while (cells.length > 0);
+
+      while (true) {
+        const nextGroupLevel = cellsRef.current[0]?.groupLevel;
+        if (nextGroupLevel == null) {
+          break;
+        }
+
+        await sleep(500);
+        await animateCompletedGroup(nextGroupLevel);
+      }
     }
 
-    await new Promise((res) => setTimeout(res, 100));
+    await sleep(1000);
     setIsAnimating(false);
     setGameOver(true);
-  }, [animateCompletedGroup, cells, disableTimer, gameWon]);
+  }, [animateCompletedGroup, cellsRef, disableTimer, gameWon]);
 
   useEffect(() => {
     if (isAnimating || gameOver) {

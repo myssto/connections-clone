@@ -51,7 +51,7 @@ export function usePuzzles() {
 
         console.warn('Could not load puzzles, falling back to sample set');
         const sample = await import('../assets/connections.json');
-        setPuzzles(sample);
+        setPuzzles(sample as Puzzle[]);
       } catch (err) {
         console.error(err);
         setError(
