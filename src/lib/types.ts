@@ -11,3 +11,11 @@ export type PuzzleAnswerGroup = {
   group: string;
   members: string[];
 };
+
+export type PuzzleCell = {
+  id: number;
+  groupLevel: PuzzleGroupLevel;
+  word: string;
+};
+
+export type GuessHistoryEntry = Omit<PuzzleCell, 'word'>;

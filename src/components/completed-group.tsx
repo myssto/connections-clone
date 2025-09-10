@@ -10,7 +10,7 @@ export default function CompletedGroup({
   return (
     <motion.div
       className={cn(
-        'col-span-full flex flex-col justify-center rounded-lg text-xs shadow-2xs *:opacity-(--child-opacity) sm:text-lg md:h-20 md:min-w-[600px] md:text-xl',
+        'col-span-full flex flex-col justify-center rounded-lg text-xs shadow-2xs *:opacity-(--child-opacity) sm:text-lg md:h-20 md:min-w-[624px] md:text-xl',
         groupBgColors[group.level]
       )}
       animate={{

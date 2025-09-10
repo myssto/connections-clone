@@ -1,28 +1,23 @@
 import WordCell from './word-cell';
 import CompletedGroup from './completed-group';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { cn, groupBgColors, shuffle, sleep } from '../lib/util';
-import { resolveElements, useAnimate, motion } from 'motion/react';
-import type { Puzzle, PuzzleGroupLevel } from '../lib/types';
+import { shuffle, sleep } from '../lib/util';
+import {
+  resolveElements,
+  useAnimate,
+  motion,
+  AnimatePresence,
+} from 'motion/react';
 import { useTimer } from '../lib/hooks';
-
-type PuzzleCell = {
-  id: number;
-  groupLevel: PuzzleGroupLevel;
-  word: string;
-};
+import GameEndOverlay from './game-end-overlay';
+import type {
+  GuessHistoryEntry,
+  Puzzle,
+  PuzzleCell,
+  PuzzleGroupLevel,
+} from '../lib/types';
 
 export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
-  const initialCells = shuffle(
-    puzzle.answers.flatMap((group) =>
-      group.members.map((word, index) => ({
-        id: group.level * 4 + index,
-        groupLevel: group.level,
-        word,
-      }))
-    )
-  );
-
   // Animation state
   const [scope, animate] = useAnimate();
   const [doCellAnimation, setDoCellAnimation] = useState(true);
@@ -30,11 +25,22 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
 
   // Game state
   const [gameOver, setGameOver] = useState(false);
+  const [showResults, setShowResults] = useState(true);
   const { time, formattedTime, disableTimer } = useTimer();
-  const [cells, setCells] = useState<PuzzleCell[]>(initialCells);
+  const [cells, setCells] = useState<PuzzleCell[]>(
+    shuffle(
+      puzzle.answers.flatMap((group) =>
+        group.members.map((word, index) => ({
+          id: group.level * 4 + index,
+          groupLevel: group.level,
+          word,
+        }))
+      )
+    )
+  );
   const cellsRef = useRef(cells);
   const [selectedCellIds, setSelectedCellIds] = useState<number[]>([]);
-  const [guessHistory, setGuessHistory] = useState<number[][]>([]);
+  const [guessHistory, setGuessHistory] = useState<GuessHistoryEntry[][]>([]);
   const [mistakes, setMistakes] = useState(0);
   const [displayGroups, setDisplayGroups] = useState<PuzzleGroupLevel[]>([]);
   const [completedGroupsCount, setCompletedGroupsCount] = useState(0);
@@ -150,7 +156,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       }
     }
 
-    await sleep(1000);
+    await sleep(500);
     setIsAnimating(false);
     setGameOver(true);
   }, [animateCompletedGroup, cellsRef, disableTimer, gameWon]);
@@ -180,12 +186,14 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
   };
 
   const handleSubmit = async () => {
-    setIsAnimating(true);
-    setGuessHistory([...guessHistory, selectedCellIds]);
-
     const selectedCells = selectedCellIds.map(
       (id) => cells.find((cell) => cell.id === id)!
     );
+
+    setGuessHistory([
+      ...guessHistory,
+      selectedCells.map(({ id, groupLevel }) => ({ id, groupLevel })),
+    ]);
     const selectedGroupLevel = selectedCells[0].groupLevel;
     const selectedCellEls = resolveElements(
       `button[data-selected='true']`,
@@ -193,6 +201,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
     );
 
     // Selection confirmation bounce animation
+    setIsAnimating(true);
     await animateCellConfirmation(selectedCellEls);
 
     if (
@@ -224,110 +233,19 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
       </div>
       <div className="relative flex flex-col space-y-4">
         {/* End of game overlay */}
-        {gameOver && (
-          <>
-            {/* Blur */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="absolute -inset-12 backdrop-blur-sm"
+        <AnimatePresence>
+          {gameOver && showResults && (
+            <GameEndOverlay
+              puzzleId={puzzle.id}
+              won={gameWon}
+              time={time}
+              mistakes={mistakes}
+              completedGroupsCount={completedGroupsCount}
+              guessHistory={guessHistory}
+              onExit={() => setShowResults(false)}
             />
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="absolute inset-0 flex flex-col items-center gap-2 p-2 text-shadow-md text-shadow-neutral-800/20"
-            >
-              {/* Header */}
-              <span className="font-karnak-condensed text-3xl">
-                {gameWon ? 'Congratulations!' : 'Next Time!'}
-              </span>
-              {/* Stats */}
-              <p className="max-w-2/3 text-lg">
-                You completed{' '}
-                <span className="font-semibold text-violet-900">
-                  Puzzle #{puzzle.id}{' '}
-                </span>
-                in{' '}
-                <span className="font-semibold">
-                  {!!Math.floor(time / 60) &&
-                    `${Math.floor(time / 60)} minute(s) and`}{' '}
-                  {time % 60} second(s).{' '}
-                </span>
-                {time < 180 && "You're a speed demon!"}
-                {time >= 180 && time < 600 && 'No sweat!'}
-                {time >= 600 && 'You thought about it a lot!'}
-                <br />
-                You made{' '}
-                <span className="font-semibold text-teal-900">
-                  {guessHistory.length} guesses
-                </span>
-                {', '}
-                {gameWon ? (
-                  <>
-                    {'and had '}
-                    <span
-                      className={cn(
-                        'font-semibold text-rose-600',
-                        mistakes === 0 && 'text-yellow-500 italic',
-                        mistakes === 1 && 'text-emerald-800'
-                      )}
-                    >
-                      {mistakes === 0 && 'no mistakes!'}
-                      {mistakes === 1 && 'only one mistake!'}
-                      {mistakes > 1 && `${mistakes} mistakes.`}
-                    </span>{' '}
-                    {mistakes === 0 && 'It was a perfect game!'}
-                    {mistakes === 1 && 'Great job!'}
-                    {mistakes === 2 && 'Well done!'}
-                    {mistakes === 3 && 'It was close, but you made it!'}
-                  </>
-                ) : (
-                  <>
-                    {'and completed '}
-                    <span
-                      className={cn(
-                        'font-semibold text-rose-600',
-                        displayGroups.length > 1 && 'text-emerald-800',
-                        displayGroups.length === 4 && 'text-yellow-500 italic'
-                      )}
-                    >
-                      {displayGroups.length === 0 && 'no groups'}
-                      {displayGroups.length >= 1 &&
-                        `${displayGroups.length} groups`}{' '}
-                    </span>
-                    before running out of chances...{' '}
-                    {displayGroups.length === 0 && 'Tough luck!'}
-                    {displayGroups.length > 0 &&
-                      displayGroups.length < 4 &&
-                      'Better luck next time!'}
-                    {displayGroups.length === 4 &&
-                      'So close! You almost had it!'}
-                  </>
-                )}
-              </p>
-              {/* Guess history */}
-              <div className="mt-2 grid grid-cols-4 gap-1">
-                {guessHistory.flatMap((guess, idx) =>
-                  guess.map((cellId, idy) => {
-                    const groupLevel = initialCells.find(
-                      (c) => c.id === cellId
-                    )!.groupLevel;
-
-                    return (
-                      <span
-                        key={idx * 4 + idy}
-                        className={cn(
-                          'size-6 rounded-sm border-[1px]',
-                          groupBgColors[groupLevel]
-                        )}
-                      />
-                    );
-                  })
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
+          )}
+        </AnimatePresence>
         {/* Word grid */}
         <div
           ref={scope}
@@ -371,7 +289,7 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
             ))}
         </div>
         {/* Game control buttons */}
-        <div className="flex justify-center gap-4">
+        <div className="flex flex-wrap justify-center gap-4">
           <button
             className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
             disabled={isAnimating || gameOver}
@@ -394,13 +312,23 @@ export default function GameContainer({ puzzle }: { puzzle: Puzzle }) {
               gameOver ||
               guessHistory.some(
                 (hist) =>
-                  JSON.stringify(hist) === JSON.stringify(selectedCellIds)
+                  JSON.stringify(hist.map(({ id }) => id)) ===
+                  JSON.stringify(selectedCellIds)
               )
             }
             onClick={handleSubmit}
           >
             Submit
           </button>
+          {!isAnimating && gameOver && (
+            <button
+              className="h-12 w-32 cursor-pointer rounded-4xl border-[1px] border-black font-semibold transition-colors disabled:cursor-auto disabled:border-gray-500 disabled:text-gray-500"
+              disabled={showResults}
+              onClick={() => setShowResults(true)}
+            >
+              View Results
+            </button>
+          )}
         </div>
       </div>
     </>
