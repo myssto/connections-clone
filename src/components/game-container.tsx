@@ -41,7 +41,8 @@ export default function GameContainer({
           groupLevel: group.level,
           word,
         }))
-      )
+      ),
+      puzzle.id
     )
   );
   const cellsRef = useRef(cells);
@@ -260,8 +261,8 @@ export default function GameContainer({
           return (
             <WordCell
               key={id}
-              doAnimation={doCellAnimation}
               word={word}
+              layout={doCellAnimation}
               disabled={
                 isAnimating || (isMaxSelections && !selected) || gameOver
               }
