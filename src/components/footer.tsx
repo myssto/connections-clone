@@ -2,7 +2,11 @@ import githubIcon from '../assets/github.svg';
 import heartIcon from '../assets/heart.svg';
 import eraserIcon from '../assets/eraser.svg';
 
-export default function Footer() {
+export default function Footer({
+  onEraserClick,
+}: {
+  onEraserClick: () => void;
+}) {
   return (
     <div className="flex w-full flex-col items-center gap-2">
       <div className="relative h-[1px] w-4/5 bg-black mask-r-from-20% mask-l-from-20%" />
@@ -35,7 +39,8 @@ export default function Footer() {
           src={eraserIcon}
           alt={'Clear puzzle completion progress button'}
           title={'Clear progress'}
-          className="size-6"
+          className="size-6 cursor-pointer"
+          onClick={onEraserClick}
         />
       </div>
     </div>

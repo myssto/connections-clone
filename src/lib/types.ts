@@ -2,6 +2,7 @@ export type Puzzle = {
   id: number;
   date: string;
   answers: PuzzleAnswerGroup[];
+  completed?: boolean;
 };
 
 export type PuzzleGroupLevel = 0 | 1 | 2 | 3;

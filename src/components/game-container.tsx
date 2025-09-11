@@ -20,10 +20,12 @@ export default function GameContainer({
   puzzle,
   time,
   disableTimer,
+  onGameWon,
 }: {
   puzzle: Puzzle;
   time: number;
   disableTimer: () => void;
+  onGameWon: () => void;
 }) {
   // Animation state
   const [scope, animate] = useAnimate();
@@ -166,7 +168,9 @@ export default function GameContainer({
     await sleep(500);
     setIsAnimating(false);
     setGameOver(true);
-  }, [animateCompletedGroup, cellsRef, disableTimer, gameWon]);
+
+    onGameWon();
+  }, [animateCompletedGroup, disableTimer, gameWon, onGameWon]);
 
   useEffect(() => {
     if (isAnimating || gameOver) {

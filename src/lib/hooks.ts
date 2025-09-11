@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Puzzle } from './types';
 
 const formatTime = (s: number): string => {
@@ -30,12 +30,24 @@ export function useTimer() {
   };
 }
 
-const STORAGE_KEY = 'connections-puzzles';
+const PUZZLE_STORAGE_KEY = 'connections-puzzles';
+const PROGRESS_STORAGE_KEY = 'connections-progress';
+
+function assignProgress(puzzles: Puzzle[], progress: Set<number>) {
+  for (const id of progress) {
+    if (puzzles.length < id) {
+      continue;
+    }
+
+    puzzles[id - 1].completed = true;
+  }
+}
 
 export function usePuzzles() {
   const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [, setProgress] = useState<Set<number>>(new Set());
   const hasFetchedRef = useRef(false);
 
   useEffect(() => {
@@ -47,40 +59,53 @@ export function usePuzzles() {
     const loadPuzzles = async () => {
       setLoading(true);
       try {
-        const cached = localStorage.getItem(STORAGE_KEY);
+        let loadedProgress: Set<number> = new Set();
+        const cachedProgressData = localStorage.getItem(PROGRESS_STORAGE_KEY);
+        if (cachedProgressData) {
+          loadedProgress = new Set(JSON.parse(cachedProgressData));
+        }
 
-        if (cached) {
-          const cachedPuzzles = JSON.parse(cached);
-          setPuzzles(cachedPuzzles);
+        let loadedPuzzles: Puzzle[] | undefined;
+        const cachedPuzzleData = localStorage.getItem(PUZZLE_STORAGE_KEY);
+        if (cachedPuzzleData) {
+          const cachedPuzzles = JSON.parse(cachedPuzzleData);
+          loadedPuzzles = cachedPuzzles;
 
-          // Check if a day has passed since the most recent cached puzzle date
-          if (
-            Date.now() - new Date(cachedPuzzles.at(-1)!.date).getTime() <
-            86400000
-          ) {
-            console.log('Cached puzzles are up to date');
-            return;
+          console.log('Loaded cached puzzles');
+        }
+
+        // Check if a day has passed since the most recent cached puzzle date
+        if (
+          !loadedPuzzles ||
+          Date.now() - new Date(loadedPuzzles.at(-1)!.date).getTime() < 86400000
+        ) {
+          const res = await fetch(
+            'https://raw.githubusercontent.com/Eyefyre/NYT-Connections-Answers/refs/heads/main/connections.json'
+          );
+
+          if (res.ok) {
+            const fetchedPuzzles: Puzzle[] = await res.json();
+            localStorage.setItem(
+              PUZZLE_STORAGE_KEY,
+              JSON.stringify(fetchedPuzzles)
+            );
+
+            loadedPuzzles = fetchedPuzzles;
+
+            console.log('Fetched and cached up to date puzzles');
           }
-
-          console.log('Fetching up to date puzzles');
         }
 
-        const res = await fetch(
-          'https://raw.githubusercontent.com/Eyefyre/NYT-Connections-Answers/refs/heads/main/connections.json'
-        );
-        if (res.ok) {
-          const fetchedPuzzles: Puzzle[] = await res.json();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(fetchedPuzzles));
-          setPuzzles(fetchedPuzzles);
-
-          console.log('Fetched and cached up to date puzzles');
-
-          return;
+        if (!loadedPuzzles) {
+          console.warn('Could not load puzzles, falling back to sample set');
+          loadedPuzzles = (await import(
+            '../assets/connections.json'
+          )) as Puzzle[];
         }
 
-        console.warn('Could not load puzzles, falling back to sample set');
-        const sample = await import('../assets/connections.json');
-        setPuzzles(sample as Puzzle[]);
+        assignProgress(loadedPuzzles, loadedProgress);
+        setProgress(loadedProgress);
+        setPuzzles(loadedPuzzles);
       } catch (err) {
         console.error(err);
         setError(
@@ -92,7 +117,27 @@ export function usePuzzles() {
     };
 
     loadPuzzles();
-  });
+  }, []);
 
-  return { puzzles, loading, error };
+  const completePuzzle = useCallback((id: number) => {
+    setProgress((prev) => {
+      const newProgress = prev.add(id);
+      localStorage.setItem(
+        PROGRESS_STORAGE_KEY,
+        JSON.stringify([...newProgress])
+      );
+      return newProgress;
+    });
+    setPuzzles((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, completed: true } : p))
+    );
+  }, []);
+
+  const clearProgress = useCallback(() => {
+    setProgress(new Set<number>());
+    localStorage.removeItem(PROGRESS_STORAGE_KEY);
+    setPuzzles((prev) => prev.map((p) => ({ ...p, completed: false })));
+  }, []);
+
+  return { puzzles, loading, error, completePuzzle, clearProgress };
 }

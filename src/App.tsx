@@ -6,7 +6,8 @@ import { useTimer, usePuzzles } from './lib/hooks';
 import type { Puzzle } from './lib/types';
 
 export default function App() {
-  const { puzzles, loading, error } = usePuzzles();
+  const { puzzles, loading, error, completePuzzle, clearProgress } =
+    usePuzzles();
   const { time, formattedTime, disableTimer, resetTimer } = useTimer();
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
   const [resetKey, setResetKey] = useState(0);
@@ -57,9 +58,9 @@ export default function App() {
                 value={puzzle.id}
               >
                 {puzzles
-                  .map(({ id, date }) => (
+                  .map(({ id, completed, date }) => (
                     <option key={id} value={id}>
-                      Puzzle #{id} ({date})
+                      {completed && '✅ '}Puzzle #{id} ({date})
                     </option>
                   ))
                   .reverse()}
@@ -72,6 +73,7 @@ export default function App() {
               puzzle={puzzle}
               time={time}
               disableTimer={disableTimer}
+              onGameWon={() => completePuzzle(puzzle.id)}
             />
             {/* Meta control buttons */}
             <div className="z-10 flex flex-wrap justify-center gap-4">
@@ -91,7 +93,7 @@ export default function App() {
           </>
         )}
       </div>
-      <Footer />
+      <Footer onEraserClick={clearProgress} />
     </main>
   );
 }
