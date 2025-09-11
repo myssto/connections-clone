@@ -24,7 +24,7 @@ export default function Footer({
           />
         </a>
         <a
-          href={'https://github.com/myssto/connections-clone'}
+          href={'https://buymeacoffee.com/myssto'}
           target="_blank"
           rel="noreferrer"
         >
